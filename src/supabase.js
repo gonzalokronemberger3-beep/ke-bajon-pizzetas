@@ -89,3 +89,84 @@ export async function insertServerNotice(message) {
   const { error } = await supabase.from("delivery_notices").insert([{ message }]);
   if (error) console.warn("supabase insert notice:", error.message);
 }
+
+/* ----------------------- Repartidores ----------------------- */
+
+export async function fetchDeliveryWorkers() {
+  const { data, error } = await supabase
+    .from("delivery")
+    .select("id, name, username, photo, active, phone")
+    .eq("active", true)
+    .order("updated_at", { ascending: false });
+  if (error) {
+    console.warn("supabase fetch delivery workers:", error.message);
+    return [];
+  }
+  return data;
+}
+
+export async function fetchDeliveryByPhone(phone) {
+  const { data, error } = await supabase
+    .from("delivery")
+    .select("id")
+    .eq("phone", phone)
+    .maybeSingle();
+  if (error) return null;
+  return data;
+}
+
+export async function registerDeliveryWorker(worker) {
+  const id =
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const { data, error } = await supabase
+    .from("delivery")
+    .insert([{ id, active: false, updated_at: new Date().toISOString(), ...worker }])
+    .select("id, name, username, photo, active, phone")
+    .single();
+  if (error) return { error: error.message };
+  return { data };
+}
+
+export async function loginDeliveryWorker(phone, password) {
+  const { data, error } = await supabase
+    .from("delivery")
+    .select("id, name, username, photo, active, phone")
+    .eq("phone", phone)
+    .eq("password", password)
+    .maybeSingle();
+  if (error) return { error: error.message };
+  if (!data) return { error: "invalid" };
+  return { data };
+}
+
+/* ----------------------- Cupones de descuento ----------------------- */
+
+export async function insertCoupon(coupon) {
+  const { error } = await supabase.from("coupons").insert([coupon]);
+  if (error) return { error: error.message };
+  return { ok: true };
+}
+
+export async function fetchCoupons(profileId) {
+  const { data, error } = await supabase
+    .from("coupons")
+    .select("*")
+    .eq("profile_id", profileId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) {
+    console.warn("supabase fetch coupons:", error.message);
+    return [];
+  }
+  return data;
+}
+
+export async function markCouponUsed(couponId) {
+  const { error } = await supabase
+    .from("coupons")
+    .update({ used: true })
+    .eq("id", couponId);
+  if (error) console.warn("supabase mark coupon used:", error.message);
+}

@@ -7,14 +7,20 @@ import {
   insertServerOrder,
   fetchServerOrders,
   insertServerRedemption,
-  fetchServerDelivery,
   upsertServerDelivery,
   insertServerNotice,
+  fetchDeliveryWorkers,
+  fetchDeliveryByPhone,
+  registerDeliveryWorker,
+  loginDeliveryWorker,
+  insertCoupon,
+  fetchCoupons,
+  markCouponUsed,
 } from "./supabase.js";
 import {
   Home, UtensilsCrossed, Gift, ShoppingBag, Plus, Minus, X,
   Star, Flame, Leaf, Truck, MapPin, Check, Clock, Download,
-  ArrowLeft, Camera, MessageCircle,
+  ArrowLeft, Camera, MessageCircle, LogOut, Phone, Ticket, BadgePercent, User, Lock,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -69,7 +75,14 @@ const REWARDS = [
   { id: "pera_vino", name: "Pera al vino", cost: 250, icon: "🍐", type: "Postre" },
   { id: "cookies", name: "Cookies 😵‍💫🍪", cost: 470, icon: "🍪", type: "Postre" },
   { id: "tiramisu", name: "Tiramisú", cost: 450, icon: "🍰", type: "Postre" },
+  { id: "cupon_25", name: "Cupón 25% OFF", cost: 120, icon: "🎟️", type: "Descuento", value: 25 },
+  { id: "cupon_35", name: "Cupón 35% OFF", cost: 180, icon: "🎟️", type: "Descuento", value: 35 },
+  { id: "cupon_50", name: "Cupón 50% OFF", cost: 300, icon: "🎟️", type: "Descuento", value: 50 },
+  { id: "cupon_70", name: "Cupón 70% OFF", cost: 450, icon: "🎟️", type: "Descuento", value: 70 },
 ];
+
+const APP_VERSION = "1.3.0";
+const GITHUB_REPO = "gonzalokronemberger3-beep/ke-bajon-pizzetas";
 
 const STEPS = [
   { n: 1, title: "Elegí tu caja", desc: "x3, x4 o x6 pizzetas" },
@@ -79,6 +92,30 @@ const STEPS = [
 ];
 
 const formatPrice = (n) => `$${n.toLocaleString("es-AR")}`;
+
+function resizeImage(file, maxSize = 400, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 /* ------------------------------------------------------------------ */
 /* Arte ilustrado de las pizzetas (SVG original, sin fotos externas)  */
@@ -640,7 +677,13 @@ function RewardsView({ profile, onRedeem }) {
           return (
             <div key={r.id} className="rounded-2xl p-3 flex flex-col items-center text-center" style={{ background: "#fff", border: `1px solid ${COLORS.line}` }}>
               <span style={{ fontSize: 32 }}>{r.icon}</span>
-              <span className="text-xs font-bold mt-1 px-2 py-0.5 rounded-full" style={{ background: COLORS.line, color: COLORS.brown }}>{r.type}</span>
+              {r.value ? (
+                <span className="text-[10px] font-extrabold mt-1 px-2 py-0.5 rounded-full" style={{ background: COLORS.red, color: "#fff" }}>
+                  {r.value}% OFF
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold mt-1 px-2 py-0.5 rounded-full" style={{ background: COLORS.line, color: COLORS.brown }}>{r.type}</span>
+              )}
               <span className="text-sm font-bold mt-1" style={{ color: COLORS.brown }}>{r.name}</span>
               <span className="text-xs font-extrabold mt-0.5" style={{ color: COLORS.red }}>{r.cost} 🥥</span>
               <button
@@ -661,14 +704,26 @@ function RewardsView({ profile, onRedeem }) {
           <h3 className="font-extrabold text-lg mb-2" style={{ color: COLORS.brown, fontFamily: "'Baloo 2', sans-serif" }}>Tus canjes</h3>
           <div className="flex flex-col gap-2">
             {profile.redeemed.map((r, i) => (
-              <div key={i} className="flex items-center justify-between text-sm rounded-xl px-3 py-2" style={{ background: "#fff", border: `1px solid ${COLORS.line}` }}>
-                <span style={{ color: COLORS.brown }} className="font-bold">{r.name}</span>
-                <Check size={16} color={COLORS.green} />
+              <div key={i} className="rounded-xl px-3 py-2" style={{ background: "#fff", border: `1px solid ${COLORS.line}` }}>
+                <div className="flex items-center justify-between text-sm">
+                  <span style={{ color: COLORS.brown }} className="font-bold">{r.name}</span>
+                  <Check size={16} color={COLORS.green} />
+                </div>
+                {r.code && (
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className="rounded-lg px-2 py-1 text-xs font-extrabold tracking-wider" style={{ background: COLORS.yellow, color: COLORS.brown }}>
+                      {r.code}
+                    </span>
+                    <span className="text-[10px] font-bold" style={{ color: r.value ? COLORS.red : COLORS.muted }}>
+                      {r.value ? `${r.value}% de descuento` : "Mostralo para canjear"}
+                    </span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
           <p className="text-xs mt-2" style={{ color: COLORS.muted }}>
-            Mostrá esta pantalla en el local o al repartidor para que te entreguen lo canjeado.
+            Los cupones se aplican directo en tu pedido. Mostrá esta pantalla en el local para los canjes de postres.
           </p>
         </div>
       )}
@@ -682,7 +737,8 @@ function RewardsView({ profile, onRedeem }) {
 
 function CartView({
   cart, onRemoveItem, deliveryMode, setDeliveryMode, address, setAddress, notes, setNotes,
-  cartTotal, coquitosForOrder, onPlaceOrder, onGoMenu,
+  cartTotal, coquitosForOrder, coupons, selectedCoupon, onSelectCoupon, discount, totalAfter,
+  onPlaceOrder, onGoMenu,
 }) {
   if (cart.length === 0) {
     return (
@@ -778,19 +834,54 @@ function CartView({
         />
       </div>
 
+      {coupons.length > 0 && (
+        <div className="mt-4">
+          <h3 className="font-extrabold text-base mb-2" style={{ color: COLORS.brown, fontFamily: "'Baloo 2', sans-serif" }}>
+            Cupón de descuento
+          </h3>
+          <div className="flex flex-col gap-2">
+            {coupons.map((c) => {
+              const active = selectedCoupon?.id === c.id;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => onSelectCoupon(active ? null : c)}
+                  className="rounded-2xl px-3 py-2.5 flex items-center justify-between"
+                  style={{ background: active ? "#FFF1DC" : "#fff", border: `2px solid ${active ? COLORS.yellow : COLORS.line}` }}
+                >
+                  <span className="flex items-center gap-2">
+                    <Ticket size={18} color={active ? COLORS.red : COLORS.muted} />
+                    <span className="text-sm font-extrabold tracking-wider" style={{ color: COLORS.brown }}>{c.code}</span>
+                    <BadgePercent size={16} color={COLORS.red} />
+                    <span className="text-sm font-extrabold" style={{ color: COLORS.red }}>{c.value}%</span>
+                  </span>
+                  {active && <Check size={16} color={COLORS.green} />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="rounded-2xl p-4 mt-5" style={{ background: "#fff", border: `1px solid ${COLORS.line}` }}>
         <div className="flex justify-between text-sm" style={{ color: COLORS.brown }}><span>Subtotal pizzetas</span><span>{formatPrice(cartTotal)}</span></div>
         <div className="flex justify-between text-sm mt-1" style={{ color: COLORS.brown }}>
           <span>Envío</span>
           <span>{deliveryMode === "retiro" ? "Sin cargo" : "A confirmar"}</span>
         </div>
+        {selectedCoupon && (
+          <div className="flex justify-between text-sm mt-1" style={{ color: COLORS.red }}>
+            <span>Cupón {selectedCoupon.code} ({selectedCoupon.value}% OFF)</span>
+            <span>-{formatPrice(discount)}</span>
+          </div>
+        )}
         {deliveryMode === "delivery" && (
           <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
             El costo del envío te lo confirma el/la repartidor/a de turno al coordinar la entrega.
           </div>
         )}
         <div className="flex justify-between font-extrabold text-lg mt-2 pt-2" style={{ color: COLORS.brown, borderTop: `1px dashed ${COLORS.line}` }}>
-          <span>Total (sin envío)</span><span>{formatPrice(cartTotal)}</span>
+          <span>Total{selectedCoupon ? " con descuento" : " (sin envío)"}</span><span>{formatPrice(totalAfter)}</span>
         </div>
         <div className="text-xs mt-2" style={{ color: COLORS.red }}>
           Con este pedido sumás {coquitosForOrder} coquitos 🥥
@@ -834,7 +925,16 @@ function ConfirmView({ summary, onBackHome }) {
       </div>
 
       <div className="w-full rounded-2xl p-4 mt-3" style={{ background: "#fff", border: `1px solid ${COLORS.line}` }}>
-        <div className="flex justify-between text-sm font-bold" style={{ color: COLORS.brown }}><span>Total (sin envío)</span><span>{formatPrice(summary.total)}</span></div>
+        {summary.discount > 0 && (
+          <div className="flex justify-between text-sm font-bold" style={{ color: COLORS.red }}>
+            <span>Cupón {summary.couponCode} ({summary.couponValue}% OFF)</span>
+            <span>-{formatPrice(summary.discount)}</span>
+          </div>
+        )}
+        <div className="flex justify-between text-sm font-bold mt-2" style={{ color: COLORS.brown }}>
+          <span>Total{summary.discount ? " con descuento" : ""}</span>
+          <span>{formatPrice(summary.discount > 0 ? summary.total - summary.discount : summary.total)}</span>
+        </div>
         <div className="flex justify-between text-sm mt-2" style={{ color: COLORS.red }}><span>Coquitos sumados</span><span>+{summary.coquitosEarned} 🥥</span></div>
       </div>
 
@@ -873,8 +973,13 @@ function AdminView({ orderLog, onBack }) {
               </div>
               <div className="text-sm mt-1 font-bold" style={{ color: COLORS.brown }}>{o.summary}</div>
               {o.address && <div className="text-xs mt-1" style={{ color: COLORS.muted }}>📍 {o.address}</div>}
+              {o.discount > 0 && (
+                <div className="text-xs mt-1 font-bold" style={{ color: COLORS.red }}>
+                  🎟️ {o.couponCode} · {o.couponValue}% OFF (ahorro {formatPrice(o.discount)})
+                </div>
+              )}
               <div className="flex justify-between mt-2 font-extrabold text-sm" style={{ color: COLORS.brown }}>
-                <span>{formatPrice(o.total)}</span>
+                <span>{formatPrice(o.discount > 0 ? o.total - o.discount : o.total)}</span>
                 <span>~{o.etaMinutes} min</span>
               </div>
             </div>
@@ -885,90 +990,348 @@ function AdminView({ orderLog, onBack }) {
   );
 }
 
-function DeliveryView({ deliveryProfile, onChangeUsername, onChangePhoto, onToggleActive, onSendDelayNotice, onBack }) {
+function WorkerActiveCard({ w }) {
+  const digits = (w.phone || "").replace(/\D/g, "");
+  return (
+    <div className="flex items-center gap-3 rounded-2xl p-3" style={{ background: "#fff", border: `1px solid ${COLORS.line}` }}>
+      {w.photo ? (
+        <img
+          src={w.photo}
+          alt={`Foto de ${w.name || w.username || "repartidor"}`}
+          className="w-14 h-14 rounded-full flex-shrink-0"
+          style={{ objectFit: "cover", border: `2px solid ${COLORS.green}` }}
+        />
+      ) : (
+        <div className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: COLORS.line }}>
+          <User size={24} color={COLORS.muted} />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="font-extrabold text-sm truncate" style={{ color: COLORS.brown }}>
+          {w.name || w.username || "Repartidor"}
+        </div>
+        <div className="flex items-center gap-1.5 text-xs font-bold mt-0.5">
+          <span className="rounded-full flex-shrink-0" style={{ width: 8, height: 8, background: COLORS.green }} />
+          <span style={{ color: COLORS.green }}>activo</span>
+        </div>
+      </div>
+      {digits && (
+        <a
+          href={`https://wa.me/${digits}`}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Escribir por WhatsApp"
+          className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: "#25D366" }}
+        >
+          <MessageCircle size={16} color="#fff" />
+        </a>
+      )}
+      {digits && (
+        <a
+          href={`tel:${digits}`}
+          aria-label="Llamar"
+          className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: COLORS.cream, border: `1px solid ${COLORS.line}` }}
+        >
+          <Phone size={16} color={COLORS.brown} />
+        </a>
+      )}
+    </div>
+  );
+}
+
+function AuthField({ icon: Icon, label, value, onChange, placeholder, type = "text", maxLength = 60 }) {
+  return (
+    <div>
+      <label className="text-xs font-bold" style={{ color: COLORS.brown }}>{label}</label>
+      <div className="relative mt-1">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2">
+          <Icon size={16} color={COLORS.muted} />
+        </span>
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          type={type}
+          maxLength={maxLength}
+          className="w-full rounded-xl pl-9 pr-3 py-2 text-sm"
+          style={{ background: "#fff", border: `1px solid ${COLORS.line}`, color: COLORS.brown }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function DeliveryView({ worker, activeWorkers, onLogin, onRegister, onLogout, onChangePhoto, onToggleActive, onSendDelayNotice, onBack }) {
+  const [mode, setMode] = useState("client");
+  const [loginPhone, setLoginPhone] = useState("");
+  const [loginPass, setLoginPass] = useState("");
+  const [reg, setReg] = useState({ name: "", phone: "", username: "", password: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const [delayMsg, setDelayMsg] = useState("");
+  const fileRef = useRef(null);
+
+  const doLogin = async () => {
+    if (!loginPhone.trim() || !loginPass) {
+      setError("Completá teléfono y contraseña");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    const res = await onLogin(loginPhone.trim(), loginPass);
+    setBusy(false);
+    if (res.error) {
+      setError(res.error === "invalid" ? "Teléfono o contraseña incorrectos" : res.error);
+    } else {
+      setMode("client");
+      setLoginPhone("");
+      setLoginPass("");
+    }
+  };
+
+  const doRegister = async () => {
+    if (!reg.name.trim() || !reg.phone.trim() || !reg.password) {
+      setError("Nombre, teléfono y contraseña son obligatorios");
+      return;
+    }
+    if (reg.password.length < 4) {
+      setError("La contraseña debe tener al menos 4 caracteres");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    const res = await onRegister(reg);
+    setBusy(false);
+    if (res.error) {
+      setError(res.error === "phone_taken" ? "Ese teléfono ya está registrado. Probá ingresar." : res.error);
+    } else {
+      setMode("client");
+      setReg({ name: "", phone: "", username: "", password: "" });
+    }
+  };
+
+  const backBtn = (
+    <button onClick={onBack} className="flex items-center gap-1 mb-3 text-sm font-bold" style={{ color: COLORS.red }}>
+      <ArrowLeft size={16} /> Volver
+    </button>
+  );
+
+  if (worker) {
+    return (
+      <div className="px-4 pt-4 pb-6">
+        {backBtn}
+        <h2 className="font-extrabold text-xl mb-4" style={{ color: COLORS.brown, fontFamily: "'Baloo 2', sans-serif" }}>
+          Modo repartidor
+        </h2>
+
+        <div className="flex flex-col items-center mb-5">
+          <div className="relative cursor-pointer" onClick={() => fileRef.current && fileRef.current.click()}>
+            {worker.photo ? (
+              <img
+                src={worker.photo}
+                alt="Foto de perfil del repartidor"
+                className="w-24 h-24 rounded-full"
+                style={{ border: `3px solid ${COLORS.red}`, objectFit: "cover" }}
+              />
+            ) : (
+              <div
+                className="w-24 h-24 rounded-full flex items-center justify-center"
+                style={{ background: COLORS.line, border: `3px solid ${COLORS.red}` }}
+              >
+                <Camera size={28} color={COLORS.muted} />
+              </div>
+            )}
+            <span
+              className="absolute bottom-0 right-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold"
+              style={{ background: COLORS.red, color: "#fff" }}
+            >
+              Cambiar
+            </span>
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" onChange={(e) => onChangePhoto(e.target.files?.[0])} style={{ display: "none" }} />
+          <span className="text-xs mt-1" style={{ color: COLORS.muted }}>Tu foto la ven los clientes cuando estás activo</span>
+        </div>
+
+        <div className="rounded-2xl p-3 flex flex-col gap-2.5" style={{ background: "#fff", border: `1px solid ${COLORS.line}` }}>
+          <div className="flex items-center gap-3">
+            <User size={18} color={COLORS.red} />
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: COLORS.muted }}>Nombre</div>
+              <div className="text-sm font-extrabold" style={{ color: COLORS.brown }}>{worker.name || "—"}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Phone size={18} color={COLORS.red} />
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: COLORS.muted }}>Teléfono</div>
+              <div className="text-sm font-extrabold" style={{ color: COLORS.brown }}>{worker.phone || "—"}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Truck size={18} color={COLORS.red} />
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: COLORS.muted }}>Usuario</div>
+              <div className="text-sm font-extrabold" style={{ color: COLORS.brown }}>{worker.username || worker.name || "—"}</div>
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={onToggleActive}
+          className="w-full mt-4 rounded-2xl p-3 flex items-center justify-between"
+          style={{ background: "#fff", border: `1px solid ${COLORS.line}` }}
+        >
+          <span className="text-sm font-bold" style={{ color: COLORS.brown }}>Tu estado</span>
+          <span className="flex items-center gap-2">
+            <span className="rounded-full" style={{ width: 10, height: 10, background: worker.active ? COLORS.green : "#B79B7B" }} />
+            <span className="text-sm font-extrabold" style={{ color: worker.active ? COLORS.green : "#B79B7B" }}>
+              {worker.active ? "Activo 🟢" : "Inactivo"}
+            </span>
+          </span>
+        </button>
+        <p className="text-xs mt-1.5" style={{ color: COLORS.muted }}>
+          Si estás activo, aparecés en el listado de repartidores que ven los clientes.
+        </p>
+
+        <h3 className="font-extrabold text-base mt-6 mb-2" style={{ color: COLORS.brown, fontFamily: "'Baloo 2', sans-serif" }}>
+          Avisar demora a un cliente
+        </h3>
+        <textarea
+          value={delayMsg}
+          onChange={(e) => setDelayMsg(e.target.value)}
+          placeholder="Ej: vamos a llegar 10 minutos más tarde por tránsito"
+          rows={2}
+          maxLength={200}
+          className="w-full rounded-xl px-3 py-2 text-sm"
+          style={{ background: "#fff", border: `1px solid ${COLORS.line}`, color: COLORS.brown }}
+        />
+        <button
+          onClick={() => {
+            if (delayMsg.trim().length === 0) return;
+            onSendDelayNotice(delayMsg);
+            setDelayMsg("");
+          }}
+          className="w-full mt-2 rounded-full py-2.5 font-extrabold text-sm flex items-center justify-center gap-2"
+          style={{ background: COLORS.red, color: "#fff" }}
+        >
+          <MessageCircle size={16} /> Enviar aviso
+        </button>
+
+        <button
+          onClick={onLogout}
+          className="w-full mt-5 rounded-2xl py-2.5 font-extrabold text-sm flex items-center justify-center gap-2"
+          style={{ background: COLORS.cream, border: `1.5px solid ${COLORS.red}`, color: COLORS.red }}
+        >
+          <LogOut size={16} /> Cerrar sesión
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="px-4 pt-4 pb-6">
-      <button onClick={onBack} className="flex items-center gap-1 mb-3 text-sm font-bold" style={{ color: COLORS.red }}>
-        <ArrowLeft size={16} /> Volver
-      </button>
-      <h2 className="font-extrabold text-xl mb-4" style={{ color: COLORS.brown, fontFamily: "'Baloo 2', sans-serif" }}>
-        Modo repartidor
+      {backBtn}
+      <h2 className="font-extrabold text-xl mb-1" style={{ color: COLORS.brown, fontFamily: "'Baloo 2', sans-serif" }}>
+        Repartidores
       </h2>
 
-      <div className="flex flex-col items-center mb-5">
-        <label className="relative cursor-pointer">
-          {deliveryProfile.photo ? (
-            <img
-              src={deliveryProfile.photo}
-              alt="Foto de perfil del repartidor"
-              className="w-24 h-24 rounded-full"
-              style={{ border: `3px solid ${COLORS.red}`, objectFit: "cover" }}
-            />
+      {mode === "client" && (
+        <>
+          <div className="rounded-2xl p-3 mb-4 text-xs" style={{ background: "#FFF1DC", color: COLORS.muted }}>
+            Acá ves quién está repartiendo ahora mismo. Tocá el botón verde para escribirle por WhatsApp o llamarlo.
+          </div>
+
+          {activeWorkers.length === 0 ? (
+            <div className="rounded-2xl p-5 text-center" style={{ background: "#fff", border: `1px solid ${COLORS.line}` }}>
+              <Mascot size={80} mood="sad" />
+              <p className="text-sm font-bold mt-2" style={{ color: COLORS.brown }}>Ahora no hay repartidores activos</p>
+              <p className="text-xs mt-1" style={{ color: COLORS.muted }}>
+                Tu pedido igual se puede hacer: el local coordina la entrega. ¡Revisá de nuevo en unos minutos!
+              </p>
+            </div>
           ) : (
-            <div
-              className="w-24 h-24 rounded-full flex items-center justify-center"
-              style={{ background: COLORS.line, border: `3px solid ${COLORS.red}` }}
-            >
-              <Camera size={28} color={COLORS.muted} />
+            <div className="flex flex-col gap-3">
+              {activeWorkers.map((w) => (
+                <WorkerActiveCard key={w.id} w={w} />
+              ))}
             </div>
           )}
-          <input type="file" accept="image/*" onChange={onChangePhoto} style={{ display: "none" }} />
-        </label>
-        <span className="text-xs mt-1" style={{ color: COLORS.muted }}>Tocá para subir tu foto</span>
-      </div>
 
-      <label className="text-xs font-bold" style={{ color: COLORS.brown }}>Nombre de usuario</label>
-      <input
-        value={deliveryProfile.username}
-        onChange={(e) => onChangeUsername(e.target.value)}
-        placeholder="Ej: JuanRepartidor"
-        maxLength={30}
-        className="w-full mt-1 rounded-xl px-3 py-2 text-sm"
-        style={{ background: "#fff", border: `1px solid ${COLORS.line}`, color: COLORS.brown }}
-      />
+          <div className="mt-6 rounded-2xl p-4 flex flex-col items-center gap-3" style={{ background: "#fff", border: `1px dashed ${COLORS.line}` }}>
+            <p className="text-xs font-bold" style={{ color: COLORS.muted }}>¿Trabajás en delivery y querés repartir para Ke Bajón?</p>
+            <div className="flex gap-2 w-full">
+              <button
+                onClick={() => setMode("login")}
+                className="flex-1 rounded-full py-2 text-xs font-extrabold"
+                style={{ background: COLORS.red, color: "#fff" }}
+              >
+                Ingresar
+              </button>
+              <button
+                onClick={() => setMode("register")}
+                className="flex-1 rounded-full py-2 text-xs font-extrabold"
+                style={{ background: COLORS.yellow, color: COLORS.brown }}
+              >
+                Registrarme
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
-      <button
-        onClick={onToggleActive}
-        className="w-full mt-4 rounded-2xl p-3 flex items-center justify-between"
-        style={{ background: "#fff", border: `1px solid ${COLORS.line}` }}
-      >
-        <span className="text-sm font-bold" style={{ color: COLORS.brown }}>Tu estado</span>
-        <span className="flex items-center gap-2">
-          <span className="rounded-full" style={{ width: 10, height: 10, background: deliveryProfile.active ? COLORS.green : "#B79B7B" }} />
-          <span className="text-sm font-extrabold" style={{ color: deliveryProfile.active ? COLORS.green : "#B79B7B" }}>
-            {deliveryProfile.active ? "Activo" : "Inactivo"}
-          </span>
-        </span>
-      </button>
+      {mode === "login" && (
+        <div className="mt-2">
+          <button onClick={() => setMode("client")} className="flex items-center gap-1 mb-3 text-sm font-bold" style={{ color: COLORS.red }}>
+            <ArrowLeft size={16} /> Repartidores
+          </button>
+          <h3 className="font-extrabold text-lg mb-3" style={{ color: COLORS.brown, fontFamily: "'Baloo 2', sans-serif" }}>Ingresar</h3>
+          <div className="flex flex-col gap-3">
+            <AuthField icon={Phone} label="Teléfono" value={loginPhone} onChange={setLoginPhone} placeholder="Ej: 5491123456789" />
+            <AuthField icon={Lock} label="Contraseña" value={loginPass} onChange={setLoginPass} placeholder="Tu contraseña" type="password" />
+          </div>
+          {error && <p className="text-xs font-bold mt-3" style={{ color: COLORS.red }}>{error}</p>}
+          <button
+            onClick={doLogin}
+            disabled={busy}
+            className="w-full mt-4 rounded-full py-3 font-extrabold text-sm active:scale-95 transition"
+            style={{ background: COLORS.red, color: "#fff", opacity: busy ? 0.5 : 1 }}
+          >
+            {busy ? "Ingresando..." : "Ingresar"}
+          </button>
+          <button onClick={() => { setError(""); setMode("register"); }} className="w-full mt-2 text-center text-xs font-bold underline" style={{ color: COLORS.muted }}>
+            ¿Todavía no tenés cuenta? Registrate
+          </button>
+        </div>
+      )}
 
-      <h3 className="font-extrabold text-base mt-6 mb-2" style={{ color: COLORS.brown, fontFamily: "'Baloo 2', sans-serif" }}>
-        Avisar demora a un cliente
-      </h3>
-      <textarea
-        value={delayMsg}
-        onChange={(e) => setDelayMsg(e.target.value)}
-        placeholder="Ej: vamos a llegar 10 minutos más tarde por tránsito"
-        rows={2}
-        maxLength={200}
-        className="w-full rounded-xl px-3 py-2 text-sm"
-        style={{ background: "#fff", border: `1px solid ${COLORS.line}`, color: COLORS.brown }}
-      />
-      <button
-        onClick={() => {
-          if (delayMsg.trim().length === 0) return;
-          onSendDelayNotice(delayMsg);
-          setDelayMsg("");
-        }}
-        className="w-full mt-2 rounded-full py-2.5 font-extrabold text-sm flex items-center justify-center gap-2"
-        style={{ background: COLORS.red, color: "#fff" }}
-      >
-        <MessageCircle size={16} /> Enviar aviso
-      </button>
-      <p className="text-xs mt-2" style={{ color: COLORS.muted }}>
-        El aviso queda registrado en el backend (tabla delivery_notices). Para que le llegue al celular
-        del cliente hace falta sumar un canal de notificaciones (push, SMS o WhatsApp).
-      </p>
+      {mode === "register" && (
+        <div className="mt-2">
+          <button onClick={() => setMode("client")} className="flex items-center gap-1 mb-3 text-sm font-bold" style={{ color: COLORS.red }}>
+            <ArrowLeft size={16} /> Repartidores
+          </button>
+          <h3 className="font-extrabold text-lg mb-3" style={{ color: COLORS.brown, fontFamily: "'Baloo 2', sans-serif" }}>Registrarme como repartidor</h3>
+          <div className="flex flex-col gap-3">
+            <AuthField icon={User} label="Nombre" value={reg.name} onChange={(v) => setReg((p) => ({ ...p, name: v }))} placeholder="Ej: Facu" />
+            <AuthField icon={Phone} label="Teléfono (con código de país)" value={reg.phone} onChange={(v) => setReg((p) => ({ ...p, phone: v }))} placeholder="Ej: 5491123456789" />
+            <AuthField icon={Truck} label="Usuario (opcional)" value={reg.username} onChange={(v) => setReg((p) => ({ ...p, username: v }))} placeholder="Ej: facu_delivery" />
+            <AuthField icon={Lock} label="Contraseña" value={reg.password} onChange={(v) => setReg((p) => ({ ...p, password: v }))} placeholder="Mínimo 4 caracteres" type="password" />
+          </div>
+          {error && <p className="text-xs font-bold mt-3" style={{ color: COLORS.red }}>{error}</p>}
+          <button
+            onClick={doRegister}
+            disabled={busy}
+            className="w-full mt-4 rounded-full py-3 font-extrabold text-sm active:scale-95 transition"
+            style={{ background: COLORS.red, color: "#fff", opacity: busy ? 0.5 : 1 }}
+          >
+            {busy ? "Creando cuenta..." : "Crear cuenta"}
+          </button>
+          <p className="text-xs mt-3 text-center" style={{ color: COLORS.muted }}>
+            Después de registrarte vas a poder subir tu foto y ponerte "activo".
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -1011,21 +1374,36 @@ function loadOrderLog() {
   return [];
 }
 
-function loadDeliveryProfile() {
+function loadDeliveryAuth() {
   try {
     const raw = localStorage.getItem(DELIVERY_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      return {
-        username: typeof parsed.username === "string" ? parsed.username : "",
-        photo: typeof parsed.photo === "string" ? parsed.photo : null,
-        active: Boolean(parsed.active),
-      };
+      if (parsed && parsed.id) {
+        return {
+          id: parsed.id,
+          name: typeof parsed.name === "string" ? parsed.name : "",
+          username: typeof parsed.username === "string" ? parsed.username : "",
+          phone: typeof parsed.phone === "string" ? parsed.phone : "",
+          photo: typeof parsed.photo === "string" ? parsed.photo : null,
+          active: Boolean(parsed.active),
+        };
+      }
     }
   } catch (e) {
-    /* sin perfil de repartidor guardado todavía */
+    /* sin sesión de repartidor guardada todavía */
   }
-  return { username: "", photo: null, active: false };
+  return null;
+}
+
+function isNewerVersion(latest, current) {
+  const toNum = (v) => String(v).split(".").map((n) => parseInt(n, 10) || 0);
+  const a = toNum(latest);
+  const b = toNum(current);
+  for (let i = 0; i < 3; i++) {
+    if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0);
+  }
+  return false;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1043,7 +1421,11 @@ export default function App() {
   const [notes, setNotes] = useState("");
   const [profile, setProfile] = useState(loadProfile);
   const [orderLog, setOrderLog] = useState(loadOrderLog);
-  const [deliveryProfile, setDeliveryProfile] = useState(loadDeliveryProfile);
+  const [deliveryAuth, setDeliveryAuth] = useState(loadDeliveryAuth);
+  const [activeWorkers, setActiveWorkers] = useState([]);
+  const [coupons, setCoupons] = useState([]);
+  const [selectedCoupon, setSelectedCoupon] = useState(null);
+  const [updateAvailable, setUpdateAvailable] = useState(null);
   const [toast, setToast] = useState(null);
   const [lastOrder, setLastOrder] = useState(null);
   const [installEvent, setInstallEvent] = useState(null);
@@ -1110,11 +1492,11 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(DELIVERY_KEY, JSON.stringify(deliveryProfile));
+      localStorage.setItem(DELIVERY_KEY, JSON.stringify(deliveryAuth));
     } catch (e) {
       /* no se pudo guardar */
     }
-  }, [deliveryProfile]);
+  }, [deliveryAuth]);
 
   useEffect(() => {
     if (tab !== "admin") return undefined;
@@ -1138,6 +1520,9 @@ export default function App() {
               notes: o.notes || "",
               total: o.total || 0,
               etaMinutes: o.eta_minutes || 30,
+              couponCode: o.coupon_code || null,
+              couponValue: o.coupon_value || null,
+              discount: o.discount || 0,
             },
             ...prev,
           ].slice(0, 100)
@@ -1148,6 +1533,54 @@ export default function App() {
       supabase.removeChannel(channel);
     };
   }, [tab, deviceId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const list = await fetchCoupons(deviceId);
+      if (!cancelled) setCoupons(list.filter((c) => !c.used));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [deviceId]);
+
+  useEffect(() => {
+    if (tab !== "delivery") return undefined;
+    (async () => {
+      const list = await fetchDeliveryWorkers();
+      setActiveWorkers(list);
+    })();
+    const channel = supabase
+      .channel("delivery-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "delivery" }, () => {
+        fetchDeliveryWorkers().then(setActiveWorkers);
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [tab]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data || !data.tag_name) return;
+        const latest = data.tag_name.replace(/^v/, "");
+        if (isNewerVersion(latest, APP_VERSION)) {
+          setUpdateAvailable({
+            version: latest,
+            url: data.html_url || `https://github.com/${GITHUB_REPO}/releases/latest`,
+          });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -1254,6 +1687,7 @@ export default function App() {
     const summaryText = cart
       .map((it) => `Caja x${BOX_SIZES.find((b) => b.id === it.boxSizeId).units}`)
       .join(" + ");
+    const discount = selectedCoupon ? Math.round((cartTotal * selectedCoupon.value) / 100) : 0;
 
     setProfile((prev) => {
       const next = { ...prev, coquitos: prev.coquitos + coquitosForOrder };
@@ -1269,7 +1703,14 @@ export default function App() {
       total: cartTotal,
       coquitos: coquitosForOrder,
       eta_minutes: etaMinutes,
+      coupon_code: selectedCoupon ? selectedCoupon.code : null,
+      coupon_value: selectedCoupon ? selectedCoupon.value : null,
+      discount,
     });
+    if (selectedCoupon) {
+      markCouponUsed(selectedCoupon.id);
+      setCoupons((prev) => prev.filter((c) => c.id !== selectedCoupon.id));
+    }
     setOrderLog((prev) =>
       [
         {
@@ -1280,11 +1721,23 @@ export default function App() {
           address: deliveryMode === "delivery" ? address : "",
           total: cartTotal,
           etaMinutes,
+          couponCode: selectedCoupon ? selectedCoupon.code : null,
+          couponValue: selectedCoupon ? selectedCoupon.value : null,
+          discount,
         },
         ...prev,
       ].slice(0, 50)
     );
-    setLastOrder({ total: cartTotal, coquitosEarned: coquitosForOrder, mode: deliveryMode, etaMinutes });
+    setLastOrder({
+      total: cartTotal,
+      coquitosEarned: coquitosForOrder,
+      mode: deliveryMode,
+      etaMinutes,
+      discount,
+      couponCode: selectedCoupon ? selectedCoupon.code : null,
+      couponValue: selectedCoupon ? selectedCoupon.value : null,
+    });
+    setSelectedCoupon(null);
     setCart([]);
     setAddress("");
     setNotes("");
@@ -1294,34 +1747,101 @@ export default function App() {
   const redeemReward = (rewardId) => {
     const reward = REWARDS.find((r) => r.id === rewardId);
     if (!reward || profile.coquitos < reward.cost) return;
-    setProfile((prev) => {
-      const next = {
-        coquitos: prev.coquitos - reward.cost,
-        redeemed: [{ name: reward.name, date: new Date().toISOString() }, ...prev.redeemed].slice(0, 10),
-      };
-      insertServerRedemption({ profile_id: deviceId, reward_name: reward.name, reward_cost: reward.cost });
-      upsertServerProfile({ id: deviceId, coquitos: next.coquitos, redeemed: next.redeemed.length });
-      return next;
-    });
+    const code = reward.value
+      ? `KBJ-${Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8)}`
+      : null;
+    const next = {
+      coquitos: profile.coquitos - reward.cost,
+      redeemed: [
+        { name: reward.name, date: new Date().toISOString(), code, value: reward.value || 0 },
+        ...profile.redeemed,
+      ].slice(0, 10),
+    };
+    setProfile(next);
+    if (reward.value && code) {
+      insertCoupon({ profile_id: deviceId, code, value: reward.value });
+      setCoupons((prev) => [
+        ...prev,
+        { id: `local-${Date.now()}`, profile_id: deviceId, code, value: reward.value, used: false },
+      ]);
+    }
+    insertServerRedemption({ profile_id: deviceId, reward_name: reward.name, reward_cost: reward.cost });
+    upsertServerProfile({ id: deviceId, coquitos: next.coquitos, redeemed: next.redeemed.length });
     showToast(`¡Canjeaste ${reward.name}! 🎉`);
   };
 
-  const handlePhotoChange = (e) => {
-    const file = e.target.files && e.target.files[0];
+  const handleWorkerPhoto = async (file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setDeliveryProfile((prev) => ({ ...prev, photo: reader.result }));
-    };
-    reader.readAsDataURL(file);
+    try {
+      const dataUrl = await resizeImage(file);
+      setDeliveryAuth((prev) => {
+        if (!prev) return prev;
+        const next = { ...prev, photo: dataUrl };
+        upsertServerDelivery({
+          id: next.id,
+          name: next.name,
+          username: next.username,
+          phone: next.phone,
+          photo: next.photo,
+          active: next.active,
+        });
+        return next;
+      });
+      showToast("Foto actualizada ✅");
+    } catch (e) {
+      showToast("No se pudo cargar la foto");
+    }
   };
 
-  const handleUsernameChange = (username) => {
-    setDeliveryProfile((prev) => ({ ...prev, username }));
+  const handleToggleActive = () => {
+    setDeliveryAuth((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, active: !prev.active };
+      upsertServerDelivery({
+        id: next.id,
+        name: next.name,
+        username: next.username,
+        phone: next.phone,
+        photo: next.photo,
+        active: next.active,
+      });
+      return next;
+    });
   };
 
-  const toggleDeliveryActive = () => {
-    setDeliveryProfile((prev) => ({ ...prev, active: !prev.active }));
+  const handleLogin = async (phone, password) => {
+    const res = await loginDeliveryWorker(phone, password);
+    if (res.data) setDeliveryAuth(res.data);
+    return res;
+  };
+
+  const handleRegister = async (reg) => {
+    const existing = await fetchDeliveryByPhone(reg.phone.trim());
+    if (existing) return { error: "phone_taken" };
+    const res = await registerDeliveryWorker({
+      name: reg.name.trim(),
+      username: reg.username.trim() || reg.name.trim(),
+      phone: reg.phone.trim(),
+      password: reg.password,
+      photo: null,
+    });
+    if (res.data) setDeliveryAuth(res.data);
+    return res;
+  };
+
+  const handleLogout = () => {
+    if (deliveryAuth) {
+      upsertServerDelivery({
+        id: deliveryAuth.id,
+        name: deliveryAuth.name,
+        username: deliveryAuth.username,
+        phone: deliveryAuth.phone,
+        photo: deliveryAuth.photo,
+        active: false,
+      });
+    }
+    setDeliveryAuth(null);
+    showToast("Sesión cerrada");
   };
 
   const sendDelayNotice = (msg) => {
@@ -1330,13 +1850,17 @@ export default function App() {
   };
 
   useEffect(() => {
-    upsertServerDelivery({
-      id: deviceId,
-      username: deliveryProfile.username,
-      photo: deliveryProfile.photo,
-      active: deliveryProfile.active,
-    });
-  }, [deliveryProfile, deviceId]);
+    if (deliveryAuth) {
+      upsertServerDelivery({
+        id: deliveryAuth.id,
+        name: deliveryAuth.name,
+        username: deliveryAuth.username,
+        phone: deliveryAuth.phone,
+        photo: deliveryAuth.photo,
+        active: deliveryAuth.active,
+      });
+    }
+  }, [deliveryAuth]);
 
   const popularFlavors = FLAVORS.filter((f) => f.popular);
   const showBottomNav = tab !== "admin";
@@ -1347,6 +1871,19 @@ export default function App() {
         <Header coquitos={profile.coquitos} onPointsClick={() => setTab("rewards")} onInstallClick={handleInstallClick} />
         {showInstallBanner && (
           <InstallBanner onInstallClick={handleInstallClick} onDismiss={() => setBannerDismissed(true)} />
+        )}
+        {updateAvailable && (
+          <div className="px-4 py-2 flex items-center justify-between gap-2" style={{ background: COLORS.green }}>
+            <button onClick={() => window.open(updateAvailable.url, "_blank")} className="flex items-center gap-2 flex-1 text-left">
+              <Download size={16} color="#fff" />
+              <span className="text-xs font-extrabold" style={{ color: "#fff" }}>
+                ¡Nueva versión {updateAvailable.version} disponible! Tocá para actualizar
+              </span>
+            </button>
+            <button onClick={() => setUpdateAvailable(null)} className="p-1 flex-shrink-0" aria-label="Cerrar aviso de actualización">
+              <X size={14} color="#fff" />
+            </button>
+          </div>
         )}
         {showIosModal && <IosInstallModal onClose={() => setShowIosModal(false)} />}
         <main className="flex-1 overflow-y-auto" style={{ paddingBottom: showBottomNav ? "6.5rem" : "1rem" }}>
@@ -1389,6 +1926,11 @@ export default function App() {
               setNotes={setNotes}
               cartTotal={cartTotal}
               coquitosForOrder={coquitosForOrder}
+              coupons={coupons}
+              selectedCoupon={selectedCoupon}
+              onSelectCoupon={setSelectedCoupon}
+              discount={selectedCoupon ? Math.round((cartTotal * selectedCoupon.value) / 100) : 0}
+              totalAfter={selectedCoupon ? cartTotal - Math.round((cartTotal * selectedCoupon.value) / 100) : cartTotal}
               onPlaceOrder={placeOrder}
               onGoMenu={() => setTab("menu")}
             />
@@ -1397,10 +1939,13 @@ export default function App() {
           {tab === "admin" && <AdminView orderLog={orderLog} onBack={() => setTab("home")} />}
           {tab === "delivery" && (
             <DeliveryView
-              deliveryProfile={deliveryProfile}
-              onChangeUsername={handleUsernameChange}
-              onChangePhoto={handlePhotoChange}
-              onToggleActive={toggleDeliveryActive}
+              worker={deliveryAuth}
+              activeWorkers={activeWorkers}
+              onLogin={handleLogin}
+              onRegister={handleRegister}
+              onLogout={handleLogout}
+              onChangePhoto={handleWorkerPhoto}
+              onToggleActive={handleToggleActive}
               onSendDelayNotice={sendDelayNotice}
               onBack={() => setTab("home")}
             />
