@@ -1,0 +1,8 @@
+{
+  "appId": "com.kebajon.app",
+  "appName": "Ke Bajon!",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": true
+  }
+}
