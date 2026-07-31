@@ -81,7 +81,7 @@ const REWARDS = [
   { id: "cupon_70", name: "Cupón 70% OFF", cost: 450, icon: "🎟️", type: "Descuento", value: 70 },
 ];
 
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.4.1";
 const GITHUB_REPO = "gonzalokronemberger3-beep/ke-bajon-pizzetas";
 const DOWNLOAD_URL = "https://ke-bajon-app.vercel.app/kebajon-release.apk";
 const DELIVERY_COSTS = { cercana: 2000, alejada: 3500 };
