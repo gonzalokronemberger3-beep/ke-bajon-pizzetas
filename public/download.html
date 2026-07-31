@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#D62839" />
+    <meta name="description" content="Descargá la app Ke Bajón! en tu celular." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>Descargar Ke Bajón! · Pizzetas a domicilio</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <style>
+      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+      html, body { margin: 0; padding: 0; height: 100%; }
+      body {
+        font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #FFF8EE;
+        color: #2C1810;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 24px 20px 40px;
+        text-align: center;
+      }
+      .card {
+        background: #fff;
+        border: 1px solid #F1E4CE;
+        border-radius: 24px;
+        padding: 28px 24px;
+        width: 100%;
+        max-width: 400px;
+        box-shadow: 0 10px 30px rgba(44, 24, 16, 0.08);
+      }
+      .logo {
+        font-family: "Baloo 2", "Nunito", sans-serif;
+        font-size: 26px;
+        font-weight: 800;
+        color: #2C1810;
+        margin: 0 0 4px;
+      }
+      .logo span.red { color: #D62839; }
+      .logo span.yellow { color: #F4B942; }
+      .pizza { font-size: 42px; line-height: 1; margin: 8px 0 12px; }
+      h1 { font-size: 19px; font-weight: 800; margin: 0 0 6px; color: #2C1810; font-family: "Baloo 2", "Nunito", sans-serif; }
+      p.sub { font-size: 14px; color: #8a6f56; margin: 0 0 20px; line-height: 1.5; }
+      .btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        padding: 14px 16px;
+        border-radius: 999px;
+        border: none;
+        font-size: 15px;
+        font-weight: 800;
+        font-family: inherit;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      .btn-red { background: #D62839; color: #fff; }
+      .btn-cream {
+        background: #FFF8EE;
+        color: #D62839;
+        border: 1.5px solid #D62839 !important;
+        margin-top: 10px;
+      }
+      .btn-cream a { color: #D62839; text-decoration: none; }
+      .ios-steps {
+        text-align: left;
+        margin: 16px 0 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .ios-steps li {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        font-size: 14px;
+        color: #2C1810;
+        line-height: 1.45;
+      }
+      .ios-steps .num {
+        flex-shrink: 0;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: #FFF8EE;
+        border: 1.5px solid #F4B942;
+        color: #D62839;
+        font-weight: 800;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .icon-share {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        vertical-align: middle;
+        margin: 0 3px;
+      }
+      .note {
+        font-size: 12px;
+        color: #8a6f56;
+        margin-top: 16px;
+        line-height: 1.5;
+      }
+      .app-name { font-weight: 800; }
+      .hidden { display: none; }
+      @media (min-width: 480px) {
+        .card { padding: 32px 28px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="pizza">🍕</div>
+      <div class="logo">Ke Bajón<span class="red">!</span> <span class="yellow">🍕</span></div>
+      <p class="sub" id="subtitle">Descargá la app de pizzetas a domicilio.</p>
+
+      <div id="ios-box" class="hidden">
+        <h1>Instalá la app en tu iPhone</h1>
+        <p class="sub">Es gratis y se instala en un toque desde Safari.</p>
+        <ol class="ios-steps">
+          <li>
+            <span class="num">1</span>
+            <span>Abrí la app con este link y tocá el ícono de compartir en Safari
+              <svg class="icon-share" viewBox="0 0 24 24" fill="none" stroke="#2C1810" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                <polyline points="16 6 12 2 8 6" />
+                <line x1="12" y1="2" x2="12" y2="15" />
+              </svg>
+            </span>
+          </li>
+          <li>
+            <span class="num">2</span>
+            <span>Elegí <strong>"Agregar a pantalla de inicio"</strong></span>
+          </li>
+          <li>
+            <span class="num">3</span>
+            <span>Tocá <strong>"Agregar"</strong> y listo. El ícono queda en tu inicio.</span>
+          </li>
+        </ol>
+        <a class="btn btn-red" href="/" style="margin-top: 20px;">Abrir la app 🍕</a>
+        <a class="btn btn-cream" href="/" style="text-decoration: none;">Ya la tengo instalada</a>
+        <p class="note" id="ios-note"></p>
+      </div>
+
+      <div id="android-box" class="hidden">
+        <h1>Descargá el APK</h1>
+        <p class="sub">La app para Android se instala directo desde este archivo.</p>
+        <a class="btn btn-red" href="/kebajon-release.apk" download="kebajon-release.apk">Descargar APK (Android)</a>
+        <a class="btn btn-cream" href="/">Ir a la app web</a>
+        <p class="note">Si tu teléfono te pide permiso, activá "Instalar apps desconocidas" para esta fuente.</p>
+      </div>
+
+      <div id="other-box" class="hidden">
+        <h1>Ke Bajón! en tu celu</h1>
+        <p class="sub">Elegí cómo querés usarla:</p>
+        <a class="btn btn-red" href="/">Abrir la app (web)</a>
+        <a class="btn btn-cream" href="/kebajon-release.apk" download="kebajon-release.apk">Descargar APK (Android)</a>
+        <p class="note" id="other-note">En iPhone: abrí este link con Safari y tocá "Compartir" → "Agregar a pantalla de inicio".</p>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var ua = navigator.userAgent || "";
+        var isIOS = /iPhone|iPad|iPod/i.test(ua);
+        var isAndroid = /Android/i.test(ua);
+        var isSafari = /Safari/i.test(ua) && !/Chrome|CriOS|FxiOS|OPiOS|EdgiOS/i.test(ua);
+        var show = function (id) { document.getElementById(id).classList.remove("hidden"); };
+
+        if (isIOS) {
+          show("ios-box");
+          if (!isSafari) {
+            document.getElementById("subtitle").textContent = "Pasos para tu iPhone (recordá usar Safari).";
+            document.getElementById("ios-note").textContent =
+              "No estás usando Safari. Copiá este link y pegalo en Safari para que aparezca el botón de compartir.";
+          } else {
+            document.getElementById("subtitle").textContent = "Estás en Safari. Seguí estos 3 pasos y listo.";
+          }
+        } else if (isAndroid) {
+          show("android-box");
+        } else {
+          show("other-box");
+        }
+      })();
+    </script>
+  </body>
+</html>
