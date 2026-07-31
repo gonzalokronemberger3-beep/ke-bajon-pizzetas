@@ -1,5 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
+  supabase,
+  getDeviceId,
+  fetchServerProfile,
+  upsertServerProfile,
+  insertServerOrder,
+  fetchServerOrders,
+  insertServerRedemption,
+  fetchServerDelivery,
+  upsertServerDelivery,
+  insertServerNotice,
+} from "./supabase.js";
+import {
   Home, UtensilsCrossed, Gift, ShoppingBag, Plus, Minus, X,
   Star, Flame, Leaf, Truck, MapPin, Check, Clock, Download,
   ArrowLeft, Camera, MessageCircle,
@@ -365,7 +377,7 @@ function BottomNav({ tab, setTab, cartCount }) {
       style={{
         left: "50%",
         transform: "translateX(-50%)",
-        bottom: 12,
+        bottom: 28,
         width: "calc(100% - 24px)",
         maxWidth: 406,
         background: "#fff",
@@ -449,7 +461,7 @@ function Toast({ message }) {
   return (
     <div
       className="fixed left-1/2 z-40 px-4 py-2 rounded-full text-sm font-bold shadow-lg"
-      style={{ bottom: "6.5rem", transform: "translateX(-50%)", background: COLORS.brown, color: "#fff" }}
+      style={{ bottom: "7.5rem", transform: "translateX(-50%)", background: COLORS.brown, color: "#fff" }}
     >
       {message}
     </div>
@@ -595,7 +607,7 @@ function MenuView({
         ))}
       </div>
 
-      <div className="sticky mt-6 pb-4 pt-3" style={{ bottom: "5.5rem", background: "linear-gradient(180deg, rgba(255,248,238,0) 0%, #FFF8EE 35%)" }}>
+      <div className="sticky mt-6 pb-4 pt-3" style={{ bottom: "6.5rem", background: "linear-gradient(180deg, rgba(255,248,238,0) 0%, #FFF8EE 35%)" }}>
         <button
           onClick={onAddBoxToCart}
           disabled={!canAdd}
@@ -845,8 +857,8 @@ function AdminView({ orderLog, onBack }) {
         Pedidos entrantes
       </h2>
       <div className="rounded-2xl p-3 mb-4 text-xs" style={{ background: "#FFF1DC", color: COLORS.muted }}>
-        Esto muestra los pedidos hechos desde este mismo celular o navegador. Para verlos desde
-        cualquier dispositivo en tiempo real hace falta un backend propio (mirá SEGURIDAD.md del proyecto).
+        Pedidos en tiempo real desde el backend de Supabase: se ven acá los que llegan desde
+        cualquier dispositivo (celular, Android o navegador).
       </div>
 
       {orderLog.length === 0 ? (
@@ -954,8 +966,8 @@ function DeliveryView({ deliveryProfile, onChangeUsername, onChangePhoto, onTogg
         <MessageCircle size={16} /> Enviar aviso
       </button>
       <p className="text-xs mt-2" style={{ color: COLORS.muted }}>
-        Por ahora este aviso queda simulado acá. Para que llegue de verdad al celular del cliente hace
-        falta un backend con notificaciones (push, SMS o WhatsApp).
+        El aviso queda registrado en el backend (tabla delivery_notices). Para que le llegue al celular
+        del cliente hace falta sumar un canal de notificaciones (push, SMS o WhatsApp).
       </p>
     </div>
   );
@@ -1038,6 +1050,7 @@ export default function App() {
   const [showIosModal, setShowIosModal] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const toastTimer = useRef(null);
+  const deviceId = getDeviceId();
 
   const isStandalone =
     typeof window !== "undefined" &&
@@ -1062,6 +1075,32 @@ export default function App() {
   }, [profile]);
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const server = await fetchServerProfile(deviceId);
+      if (cancelled) return;
+      if (server) {
+        setProfile((prev) => ({
+          coquitos: Math.max(prev.coquitos, server.coquitos || 0),
+          redeemed:
+            server.redeemed > (prev.redeemed.length || 0)
+              ? Array.from({ length: server.redeemed }, (_, i) => ({
+                  name: "canje",
+                  date: new Date().toISOString(),
+                  id: i,
+                }))
+              : prev.redeemed,
+        }));
+      } else {
+        upsertServerProfile({ id: deviceId, coquitos: 0, redeemed: 0 });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [deviceId]);
+
+  useEffect(() => {
     try {
       localStorage.setItem(ORDERS_KEY, JSON.stringify(orderLog));
     } catch (e) {
@@ -1076,6 +1115,39 @@ export default function App() {
       /* no se pudo guardar */
     }
   }, [deliveryProfile]);
+
+  useEffect(() => {
+    if (tab !== "admin") return undefined;
+    (async () => {
+      const serverOrders = await fetchServerOrders();
+      setOrderLog(serverOrders);
+    })();
+    const channel = supabase
+      .channel("orders-live")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload) => {
+        const o = payload.new;
+        if (!o) return;
+        setOrderLog((prev) =>
+          [
+            {
+              id: o.id,
+              date: o.created_at || new Date().toISOString(),
+              summary: o.summary || "",
+              mode: o.mode || "retiro",
+              address: o.address || "",
+              notes: o.notes || "",
+              total: o.total || 0,
+              etaMinutes: o.eta_minutes || 30,
+            },
+            ...prev,
+          ].slice(0, 100)
+        );
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [tab, deviceId]);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -1183,10 +1255,21 @@ export default function App() {
       .map((it) => `Caja x${BOX_SIZES.find((b) => b.id === it.boxSizeId).units}`)
       .join(" + ");
 
-    setProfile((prev) => ({
-      coquitos: prev.coquitos + coquitosForOrder,
-      redeemed: prev.redeemed,
-    }));
+    setProfile((prev) => {
+      const next = { ...prev, coquitos: prev.coquitos + coquitosForOrder };
+      upsertServerProfile({ id: deviceId, coquitos: next.coquitos, redeemed: next.redeemed.length });
+      return next;
+    });
+    insertServerOrder({
+      profile_id: deviceId,
+      summary: summaryText,
+      mode: deliveryMode,
+      address: deliveryMode === "delivery" ? address : "",
+      notes: notes || "",
+      total: cartTotal,
+      coquitos: coquitosForOrder,
+      eta_minutes: etaMinutes,
+    });
     setOrderLog((prev) =>
       [
         {
@@ -1211,10 +1294,15 @@ export default function App() {
   const redeemReward = (rewardId) => {
     const reward = REWARDS.find((r) => r.id === rewardId);
     if (!reward || profile.coquitos < reward.cost) return;
-    setProfile((prev) => ({
-      coquitos: prev.coquitos - reward.cost,
-      redeemed: [{ name: reward.name, date: new Date().toISOString() }, ...prev.redeemed].slice(0, 10),
-    }));
+    setProfile((prev) => {
+      const next = {
+        coquitos: prev.coquitos - reward.cost,
+        redeemed: [{ name: reward.name, date: new Date().toISOString() }, ...prev.redeemed].slice(0, 10),
+      };
+      insertServerRedemption({ profile_id: deviceId, reward_name: reward.name, reward_cost: reward.cost });
+      upsertServerProfile({ id: deviceId, coquitos: next.coquitos, redeemed: next.redeemed.length });
+      return next;
+    });
     showToast(`¡Canjeaste ${reward.name}! 🎉`);
   };
 
@@ -1236,9 +1324,19 @@ export default function App() {
     setDeliveryProfile((prev) => ({ ...prev, active: !prev.active }));
   };
 
-  const sendDelayNotice = () => {
-    showToast("Aviso enviado (simulado) ✅");
+  const sendDelayNotice = (msg) => {
+    insertServerNotice(msg);
+    showToast("Aviso enviado ✅");
   };
+
+  useEffect(() => {
+    upsertServerDelivery({
+      id: deviceId,
+      username: deliveryProfile.username,
+      photo: deliveryProfile.photo,
+      active: deliveryProfile.active,
+    });
+  }, [deliveryProfile, deviceId]);
 
   const popularFlavors = FLAVORS.filter((f) => f.popular);
   const showBottomNav = tab !== "admin";
@@ -1251,7 +1349,7 @@ export default function App() {
           <InstallBanner onInstallClick={handleInstallClick} onDismiss={() => setBannerDismissed(true)} />
         )}
         {showIosModal && <IosInstallModal onClose={() => setShowIosModal(false)} />}
-        <main className="flex-1 overflow-y-auto" style={{ paddingBottom: showBottomNav ? "5.75rem" : "1rem" }}>
+        <main className="flex-1 overflow-y-auto" style={{ paddingBottom: showBottomNav ? "6.5rem" : "1rem" }}>
           {tab === "home" && (
             <HomeView
               onGoMenu={() => setTab("menu")}
