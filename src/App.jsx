@@ -738,7 +738,8 @@ function RewardsView({ profile, onRedeem }) {
 }
 
 function CartView({
-  cart, onRemoveItem, deliveryMode, setDeliveryMode, address, setAddress, notes, setNotes,
+  cart, onRemoveItem, deliveryMode, setDeliveryMode, addrStreet, setAddrStreet, addrNumber, setAddrNumber,
+  addrFloor, setAddrFloor, notes, setNotes,
   cartTotal, coquitosForOrder, coupons, selectedCoupon, onSelectCoupon, discount,
   deliveryZone, setDeliveryZone, deliveryCost, totalFinal, locating, onGetLocation,
   onPlaceOrder, onGoMenu,
@@ -758,7 +759,7 @@ function CartView({
     );
   }
 
-  const canConfirm = deliveryMode === "retiro" || address.trim().length > 0;
+  const canConfirm = deliveryMode === "retiro" || addrStreet.trim().length > 0;
 
   return (
     <div className="px-4 pt-4 pb-6">
@@ -812,13 +813,33 @@ function CartView({
       {deliveryMode === "delivery" && (
         <div className="mt-3">
           <label className="text-xs font-bold" style={{ color: COLORS.brown }}>Dirección de entrega</label>
+          <div className="flex gap-2 mt-1">
+            <input
+              value={addrStreet}
+              onChange={(e) => setAddrStreet(e.target.value)}
+              placeholder="Calle"
+              maxLength={120}
+              autoComplete="address-line1"
+              className="flex-[3] min-w-0 rounded-xl px-3 py-2 text-sm"
+              style={{ background: "#fff", border: `1px solid ${COLORS.line}`, color: COLORS.brown }}
+            />
+            <input
+              value={addrNumber}
+              onChange={(e) => setAddrNumber(e.target.value)}
+              placeholder="Número"
+              maxLength={20}
+              inputMode="numeric"
+              autoComplete="street-address"
+              className="flex-1 min-w-0 rounded-xl px-3 py-2 text-sm"
+              style={{ background: "#fff", border: `1px solid ${COLORS.line}`, color: COLORS.brown }}
+            />
+          </div>
           <input
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="Calle, número, piso/depto"
-            maxLength={200}
-            autoComplete="street-address"
-            className="w-full mt-1 rounded-xl px-3 py-2 text-sm"
+            value={addrFloor}
+            onChange={(e) => setAddrFloor(e.target.value)}
+            placeholder="Piso / depto (opcional)"
+            maxLength={40}
+            className="w-full mt-2 rounded-xl px-3 py-2 text-sm"
             style={{ background: "#fff", border: `1px solid ${COLORS.line}`, color: COLORS.brown }}
           />
           <button
@@ -1488,7 +1509,10 @@ export default function App() {
   const [deliveryMode, setDeliveryMode] = useState("delivery");
   const [deliveryZone, setDeliveryZone] = useState("cercana");
   const [locating, setLocating] = useState(false);
-  const [address, setAddress] = useState("");
+  const [addrStreet, setAddrStreet] = useState("");
+  const [addrNumber, setAddrNumber] = useState("");
+  const [addrFloor, setAddrFloor] = useState("");
+  const address = [addrStreet, addrNumber].filter(Boolean).join(" ") + (addrFloor ? `, ${addrFloor}` : "");
   const [notes, setNotes] = useState("");
   const [profile, setProfile] = useState(loadProfile);
   const [orderLog, setOrderLog] = useState(loadOrderLog);
@@ -1771,16 +1795,27 @@ export default function App() {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
-        const fallback = `Mi ubicación: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+        const coordsLabel = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
         try {
           const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&accept-language=es`
           );
           const data = res.ok ? await res.json() : null;
-          const name = data && data.display_name ? data.display_name : "";
-          setAddress(name ? name.split(", ").slice(0, 3).join(", ") : fallback);
+          const addr = data && data.address ? data.address : {};
+          const street =
+            addr.road ||
+            addr.pedestrian ||
+            addr.footway ||
+            addr.suburb ||
+            addr.neighbourhood ||
+            (data && data.display_name ? data.display_name.split(", ")[0] : "");
+          setAddrStreet(street || `Mi ubicación ${coordsLabel}`);
+          setAddrNumber(addr.house_number || "");
+          setAddrFloor("");
         } catch (e) {
-          setAddress(fallback);
+          setAddrStreet(`Mi ubicación ${coordsLabel}`);
+          setAddrNumber("");
+          setAddrFloor("");
         }
         setLocating(false);
         showToast("Ubicación cargada 📍");
@@ -1878,7 +1913,9 @@ export default function App() {
     });
     setSelectedCoupon(null);
     setCart([]);
-    setAddress("");
+    setAddrStreet("");
+    setAddrNumber("");
+    setAddrFloor("");
     setNotes("");
     setDeliveryZone("cercana");
     setTab("confirm");
@@ -2060,8 +2097,12 @@ export default function App() {
               onRemoveItem={removeCartItem}
               deliveryMode={deliveryMode}
               setDeliveryMode={setDeliveryMode}
-              address={address}
-              setAddress={setAddress}
+              addrStreet={addrStreet}
+              setAddrStreet={setAddrStreet}
+              addrNumber={addrNumber}
+              setAddrNumber={setAddrNumber}
+              addrFloor={addrFloor}
+              setAddrFloor={setAddrFloor}
               notes={notes}
               setNotes={setNotes}
               cartTotal={cartTotal}
