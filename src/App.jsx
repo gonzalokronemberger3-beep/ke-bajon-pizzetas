@@ -81,8 +81,9 @@ const REWARDS = [
   { id: "cupon_70", name: "Cupón 70% OFF", cost: 450, icon: "🎟️", type: "Descuento", value: 70 },
 ];
 
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.3.1";
 const GITHUB_REPO = "gonzalokronemberger3-beep/ke-bajon-pizzetas";
+const DOWNLOAD_URL = "https://ke-bajon-app.vercel.app/kebajon-release.apk";
 
 const STEPS = [
   { n: 1, title: "Elegí tu caja", desc: "x3, x4 o x6 pizzetas" },
@@ -1570,10 +1571,7 @@ export default function App() {
         if (cancelled || !data || !data.tag_name) return;
         const latest = data.tag_name.replace(/^v/, "");
         if (isNewerVersion(latest, APP_VERSION)) {
-          setUpdateAvailable({
-            version: latest,
-            url: data.html_url || `https://github.com/${GITHUB_REPO}/releases/latest`,
-          });
+          setUpdateAvailable({ version: latest, url: DOWNLOAD_URL });
         }
       })
       .catch(() => {});
@@ -1588,16 +1586,12 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(null), 2400);
   };
 
-  const handleInstallClick = async () => {
-    if (installEvent) {
-      installEvent.prompt();
-      await installEvent.userChoice;
-      setInstallEvent(null);
-    } else if (isIOS) {
+  const handleInstallClick = () => {
+    if (isIOS && !isStandalone) {
       setShowIosModal(true);
-    } else {
-      showToast("Buscá 'Instalar app' en el menú de tu navegador");
+      return;
     }
+    window.open(DOWNLOAD_URL, "_blank", "noopener");
   };
 
   const showInstallBanner = !isStandalone && !bannerDismissed && (installEvent || isIOS);
