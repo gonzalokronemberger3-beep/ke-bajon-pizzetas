@@ -81,9 +81,10 @@ const REWARDS = [
   { id: "cupon_70", name: "Cupón 70% OFF", cost: 450, icon: "🎟️", type: "Descuento", value: 70 },
 ];
 
-const APP_VERSION = "1.3.1";
+const APP_VERSION = "1.4.0";
 const GITHUB_REPO = "gonzalokronemberger3-beep/ke-bajon-pizzetas";
 const DOWNLOAD_URL = "https://ke-bajon-app.vercel.app/kebajon-release.apk";
+const DELIVERY_COSTS = { cercana: 2000, alejada: 3500 };
 
 const STEPS = [
   { n: 1, title: "Elegí tu caja", desc: "x3, x4 o x6 pizzetas" },
@@ -738,7 +739,8 @@ function RewardsView({ profile, onRedeem }) {
 
 function CartView({
   cart, onRemoveItem, deliveryMode, setDeliveryMode, address, setAddress, notes, setNotes,
-  cartTotal, coquitosForOrder, coupons, selectedCoupon, onSelectCoupon, discount, totalAfter,
+  cartTotal, coquitosForOrder, coupons, selectedCoupon, onSelectCoupon, discount,
+  deliveryZone, setDeliveryZone, deliveryCost, totalFinal, locating, onGetLocation,
   onPlaceOrder, onGoMenu,
 }) {
   if (cart.length === 0) {
@@ -819,6 +821,42 @@ function CartView({
             className="w-full mt-1 rounded-xl px-3 py-2 text-sm"
             style={{ background: "#fff", border: `1px solid ${COLORS.line}`, color: COLORS.brown }}
           />
+          <button
+            onClick={onGetLocation}
+            disabled={locating}
+            className="w-full mt-2 rounded-xl py-2 text-sm font-extrabold flex items-center justify-center gap-2"
+            style={{ background: COLORS.cream, border: `1.5px solid ${COLORS.red}`, color: COLORS.red, opacity: locating ? 0.6 : 1 }}
+          >
+            <MapPin size={16} />
+            {locating ? "Buscando tu ubicación..." : "Usar mi ubicación actual"}
+          </button>
+        </div>
+      )}
+
+      {deliveryMode === "delivery" && (
+        <div className="mt-3">
+          <label className="text-xs font-bold" style={{ color: COLORS.brown }}>Zona de entrega (estimado del envío)</label>
+          <div className="flex gap-2 mt-1">
+            {[
+              { id: "cercana", label: "Zona cercana", price: DELIVERY_COSTS.cercana },
+              { id: "alejada", label: "Zona alejada", price: DELIVERY_COSTS.alejada },
+            ].map((z) => (
+              <button
+                key={z.id}
+                onClick={() => setDeliveryZone(z.id)}
+                className="flex-1 rounded-xl px-3 py-2 flex flex-col items-center gap-0.5"
+                style={{ background: deliveryZone === z.id ? COLORS.red : "#fff", border: `2px solid ${deliveryZone === z.id ? COLORS.red : COLORS.line}` }}
+              >
+                <span className="text-xs font-bold" style={{ color: deliveryZone === z.id ? "#fff" : COLORS.brown }}>{z.label}</span>
+                <span className="text-xs font-extrabold" style={{ color: deliveryZone === z.id ? "#FFE1C2" : COLORS.red }}>{formatPrice(z.price)}</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs mt-1.5" style={{ color: COLORS.muted }}>
+            {deliveryZone === "alejada"
+              ? "Zona alejada: el envío va de $3.000 a $3.500 según la distancia. Se estima en $3.500."
+              : "Zona cercana: envío estimado en $2.000. El total lo confirma el repartidor."}
+          </p>
         </div>
       )}
 
@@ -827,7 +865,7 @@ function CartView({
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Ej: tocar timbre, sin picante, etc."
+          placeholder="Ej: la parte de atrás de la plaza, tocar timbre, sin picante, etc."
           rows={2}
           maxLength={300}
           className="w-full mt-1 rounded-xl px-3 py-2 text-sm"
@@ -868,7 +906,7 @@ function CartView({
         <div className="flex justify-between text-sm" style={{ color: COLORS.brown }}><span>Subtotal pizzetas</span><span>{formatPrice(cartTotal)}</span></div>
         <div className="flex justify-between text-sm mt-1" style={{ color: COLORS.brown }}>
           <span>Envío</span>
-          <span>{deliveryMode === "retiro" ? "Sin cargo" : "A confirmar"}</span>
+          <span>{deliveryMode === "retiro" ? "Sin cargo" : `${deliveryZone === "alejada" ? "Zona alejada" : "Zona cercana"} · ${formatPrice(deliveryCost)}`}</span>
         </div>
         {selectedCoupon && (
           <div className="flex justify-between text-sm mt-1" style={{ color: COLORS.red }}>
@@ -876,13 +914,11 @@ function CartView({
             <span>-{formatPrice(discount)}</span>
           </div>
         )}
-        {deliveryMode === "delivery" && (
-          <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
-            El costo del envío te lo confirma el/la repartidor/a de turno al coordinar la entrega.
-          </div>
-        )}
         <div className="flex justify-between font-extrabold text-lg mt-2 pt-2" style={{ color: COLORS.brown, borderTop: `1px dashed ${COLORS.line}` }}>
-          <span>Total{selectedCoupon ? " con descuento" : " (sin envío)"}</span><span>{formatPrice(totalAfter)}</span>
+          <span>Total</span><span>{formatPrice(totalFinal)}</span>
+        </div>
+        <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
+          {deliveryMode === "delivery" ? "Entrega estimada: de 15 a 30 minutos." : "Listo para retirar en el local."}
         </div>
         <div className="text-xs mt-2" style={{ color: COLORS.red }}>
           Con este pedido sumás {coquitosForOrder} coquitos 🥥
@@ -915,26 +951,31 @@ function ConfirmView({ summary, onBackHome }) {
         <Clock size={24} color={COLORS.red} />
         <div>
           <div className="font-bold text-sm" style={{ color: COLORS.brown }}>
-            {summary.mode === "delivery"
-              ? `Llega en aproximadamente ${summary.etaMinutes} minutos`
-              : `Listo para retirar en ${summary.etaMinutes} minutos`}
+            {summary.mode === "delivery" ? "Llega en de 15 a 30 minutos" : `Listo para retirar en ${summary.etaMinutes} minutos`}
           </div>
           <div className="text-xs" style={{ color: COLORS.muted }}>
-            {summary.mode === "delivery" ? "El delivery de turno te confirma el costo del envío" : "Pasá por el local cuando quieras"}
+            {summary.mode === "delivery" ? "El envío estimado ya está incluido en tu total" : "Pasá por el local cuando quieras"}
           </div>
         </div>
       </div>
 
       <div className="w-full rounded-2xl p-4 mt-3" style={{ background: "#fff", border: `1px solid ${COLORS.line}` }}>
+        <div className="flex justify-between text-sm" style={{ color: COLORS.brown }}><span>Subtotal pizzetas</span><span>{formatPrice(summary.total)}</span></div>
+        {summary.deliveryCost > 0 && (
+          <div className="flex justify-between text-sm mt-1" style={{ color: COLORS.brown }}>
+            <span>Envío ({summary.zone === "alejada" ? "zona alejada" : "zona cercana"})</span>
+            <span>{formatPrice(summary.deliveryCost)}</span>
+          </div>
+        )}
         {summary.discount > 0 && (
-          <div className="flex justify-between text-sm font-bold" style={{ color: COLORS.red }}>
+          <div className="flex justify-between text-sm mt-1 font-bold" style={{ color: COLORS.red }}>
             <span>Cupón {summary.couponCode} ({summary.couponValue}% OFF)</span>
             <span>-{formatPrice(summary.discount)}</span>
           </div>
         )}
-        <div className="flex justify-between text-sm font-bold mt-2" style={{ color: COLORS.brown }}>
-          <span>Total{summary.discount ? " con descuento" : ""}</span>
-          <span>{formatPrice(summary.discount > 0 ? summary.total - summary.discount : summary.total)}</span>
+        <div className="flex justify-between text-sm font-bold mt-2 pt-2" style={{ color: COLORS.brown, borderTop: `1px dashed ${COLORS.line}` }}>
+          <span>Total</span>
+          <span>{formatPrice(summary.total - summary.discount + (summary.deliveryCost || 0))}</span>
         </div>
         <div className="flex justify-between text-sm mt-2" style={{ color: COLORS.red }}><span>Coquitos sumados</span><span>+{summary.coquitosEarned} 🥥</span></div>
       </div>
@@ -973,15 +1014,42 @@ function AdminView({ orderLog, onBack }) {
                 <span>{o.mode === "delivery" ? "Envío" : "Retiro"}</span>
               </div>
               <div className="text-sm mt-1 font-bold" style={{ color: COLORS.brown }}>{o.summary}</div>
+              {Array.isArray(o.details) && o.details.length > 0 && (
+                <div className="mt-2 flex flex-col gap-2">
+                  {o.details.map((b, i) => (
+                    <div key={i} className="rounded-lg px-2.5 py-2" style={{ background: COLORS.cream, border: `1px solid ${COLORS.line}` }}>
+                      <div className="text-xs font-extrabold" style={{ color: COLORS.brown }}>
+                        Caja {b.box} · {b.people} personas
+                      </div>
+                      <div className="text-xs mt-1" style={{ color: COLORS.brown }}>
+                        {b.flavors.length > 0 ? b.flavors.map((f) => `${f.qty}x ${f.name}`).join(" · ") : "—"}
+                      </div>
+                      {Array.isArray(b.addons) && b.addons.length > 0 && (
+                        <div className="text-xs mt-0.5" style={{ color: COLORS.red }}>
+                          Extras: {b.addons.map((a) => `${a.qty}x ${a.name}`).join(" · ")}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
               {o.address && <div className="text-xs mt-1" style={{ color: COLORS.muted }}>📍 {o.address}</div>}
+              {o.notes && <div className="text-xs mt-1" style={{ color: COLORS.muted }}>📝 {o.notes}</div>}
               {o.discount > 0 && (
                 <div className="text-xs mt-1 font-bold" style={{ color: COLORS.red }}>
                   🎟️ {o.couponCode} · {o.couponValue}% OFF (ahorro {formatPrice(o.discount)})
                 </div>
               )}
               <div className="flex justify-between mt-2 font-extrabold text-sm" style={{ color: COLORS.brown }}>
-                <span>{formatPrice(o.discount > 0 ? o.total - o.discount : o.total)}</span>
-                <span>~{o.etaMinutes} min</span>
+                <span>{formatPrice(o.deliveryCost > 0 ? o.total : o.total - o.discount)}</span>
+                <span className="flex items-center gap-2">
+                  {o.deliveryCost > 0 && (
+                    <span className="text-[10px] font-bold" style={{ color: COLORS.muted }}>
+                      🛵 {o.zone === "alejada" ? "zona alejada" : "zona cercana"} · {formatPrice(o.deliveryCost)}
+                    </span>
+                  )}
+                  <span>~{o.etaMinutes} min</span>
+                </span>
               </div>
             </div>
           ))}
@@ -1418,6 +1486,8 @@ export default function App() {
   const [boxAddons, setBoxAddons] = useState({});
   const [cart, setCart] = useState([]);
   const [deliveryMode, setDeliveryMode] = useState("delivery");
+  const [deliveryZone, setDeliveryZone] = useState("cercana");
+  const [locating, setLocating] = useState(false);
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [profile, setProfile] = useState(loadProfile);
@@ -1503,7 +1573,24 @@ export default function App() {
     if (tab !== "admin") return undefined;
     (async () => {
       const serverOrders = await fetchServerOrders();
-      setOrderLog(serverOrders);
+      setOrderLog(
+        serverOrders.map((o) => ({
+          id: o.id,
+          date: o.created_at || new Date().toISOString(),
+          summary: o.summary || "",
+          mode: o.mode || "retiro",
+          address: o.address || "",
+          notes: o.notes || "",
+          total: o.total || 0,
+          etaMinutes: o.eta_minutes || 30,
+          couponCode: o.coupon_code || null,
+          couponValue: o.coupon_value || null,
+          discount: o.discount || 0,
+          deliveryCost: o.delivery_cost || 0,
+          zone: o.zone || null,
+          details: o.details || [],
+        }))
+      );
     })();
     const channel = supabase
       .channel("orders-live")
@@ -1524,6 +1611,9 @@ export default function App() {
               couponCode: o.coupon_code || null,
               couponValue: o.coupon_value || null,
               discount: o.discount || 0,
+              deliveryCost: o.delivery_cost || 0,
+              zone: o.zone || null,
+              details: o.details || [],
             },
             ...prev,
           ].slice(0, 100)
@@ -1670,6 +1760,38 @@ export default function App() {
 
   const cartTotal = cart.reduce((s, it) => s + it.subtotal, 0);
   const coquitosForOrder = cart.reduce((s, it) => s + it.coquitos, 0);
+  const deliveryCost = deliveryMode === "delivery" ? DELIVERY_COSTS[deliveryZone] : 0;
+
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      showToast("Tu navegador no soporta ubicación");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const fallback = `Mi ubicación: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&accept-language=es`
+          );
+          const data = res.ok ? await res.json() : null;
+          const name = data && data.display_name ? data.display_name : "";
+          setAddress(name ? name.split(", ").slice(0, 3).join(", ") : fallback);
+        } catch (e) {
+          setAddress(fallback);
+        }
+        setLocating(false);
+        showToast("Ubicación cargada 📍");
+      },
+      () => {
+        setLocating(false);
+        showToast("No se pudo obtener tu ubicación");
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+    );
+  };
 
   const placeOrder = () => {
     if (cart.length === 0) return;
@@ -1677,11 +1799,25 @@ export default function App() {
       showToast("Ingresá tu dirección para el envío");
       return;
     }
-    const etaMinutes = deliveryMode === "delivery" ? 30 + Math.floor(Math.random() * 16) : 15 + Math.floor(Math.random() * 11);
+    const etaMinutes = deliveryMode === "delivery" ? 30 : 15 + Math.floor(Math.random() * 11);
     const summaryText = cart
       .map((it) => `Caja x${BOX_SIZES.find((b) => b.id === it.boxSizeId).units}`)
       .join(" + ");
+    const details = cart.map((it) => {
+      const box = BOX_SIZES.find((b) => b.id === it.boxSizeId);
+      return {
+        box: `x${box.units}`,
+        people: box.people,
+        flavors: Object.entries(it.flavors)
+          .filter(([, qty]) => qty > 0)
+          .map(([fid, qty]) => ({ name: FLAVORS.find((x) => x.id === fid)?.name || fid, qty })),
+        addons: Object.entries(it.addons)
+          .filter(([, qty]) => qty > 0)
+          .map(([aid, qty]) => ({ name: ADDONS.find((x) => x.id === aid)?.name || aid, qty })),
+      };
+    });
     const discount = selectedCoupon ? Math.round((cartTotal * selectedCoupon.value) / 100) : 0;
+    const finalTotal = cartTotal - discount + deliveryCost;
 
     setProfile((prev) => {
       const next = { ...prev, coquitos: prev.coquitos + coquitosForOrder };
@@ -1694,12 +1830,15 @@ export default function App() {
       mode: deliveryMode,
       address: deliveryMode === "delivery" ? address : "",
       notes: notes || "",
-      total: cartTotal,
+      total: finalTotal,
       coquitos: coquitosForOrder,
       eta_minutes: etaMinutes,
       coupon_code: selectedCoupon ? selectedCoupon.code : null,
       coupon_value: selectedCoupon ? selectedCoupon.value : null,
       discount,
+      delivery_cost: deliveryCost,
+      zone: deliveryMode === "delivery" ? deliveryZone : null,
+      details,
     });
     if (selectedCoupon) {
       markCouponUsed(selectedCoupon.id);
@@ -1713,11 +1852,14 @@ export default function App() {
           summary: summaryText,
           mode: deliveryMode,
           address: deliveryMode === "delivery" ? address : "",
-          total: cartTotal,
+          total: finalTotal,
           etaMinutes,
           couponCode: selectedCoupon ? selectedCoupon.code : null,
           couponValue: selectedCoupon ? selectedCoupon.value : null,
           discount,
+          deliveryCost,
+          zone: deliveryMode === "delivery" ? deliveryZone : null,
+          details,
         },
         ...prev,
       ].slice(0, 50)
@@ -1730,11 +1872,15 @@ export default function App() {
       discount,
       couponCode: selectedCoupon ? selectedCoupon.code : null,
       couponValue: selectedCoupon ? selectedCoupon.value : null,
+      deliveryCost,
+      zone: deliveryMode === "delivery" ? deliveryZone : null,
+      details,
     });
     setSelectedCoupon(null);
     setCart([]);
     setAddress("");
     setNotes("");
+    setDeliveryZone("cercana");
     setTab("confirm");
   };
 
@@ -1924,7 +2070,12 @@ export default function App() {
               selectedCoupon={selectedCoupon}
               onSelectCoupon={setSelectedCoupon}
               discount={selectedCoupon ? Math.round((cartTotal * selectedCoupon.value) / 100) : 0}
-              totalAfter={selectedCoupon ? cartTotal - Math.round((cartTotal * selectedCoupon.value) / 100) : cartTotal}
+              deliveryZone={deliveryZone}
+              setDeliveryZone={setDeliveryZone}
+              deliveryCost={deliveryCost}
+              totalFinal={cartTotal - (selectedCoupon ? Math.round((cartTotal * selectedCoupon.value) / 100) : 0) + deliveryCost}
+              locating={locating}
+              onGetLocation={handleGetLocation}
               onPlaceOrder={placeOrder}
               onGoMenu={() => setTab("menu")}
             />
