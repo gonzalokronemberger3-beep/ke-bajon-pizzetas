@@ -360,7 +360,20 @@ function BottomNav({ tab, setTab, cartCount }) {
     { id: "cart", label: "Pedido", icon: ShoppingBag },
   ];
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-30 flex mx-auto" style={{ maxWidth: "430px", background: "#fff", borderTop: `1px solid ${COLORS.line}` }}>
+    <nav
+      className="fixed z-30 flex"
+      style={{
+        left: "50%",
+        transform: "translateX(-50%)",
+        bottom: 12,
+        width: "calc(100% - 24px)",
+        maxWidth: 406,
+        background: "#fff",
+        border: `1px solid ${COLORS.line}`,
+        borderRadius: 18,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+      }}
+    >
       {items.map((it) => {
         const Icon = it.icon;
         const active = tab === it.id;
@@ -436,7 +449,7 @@ function Toast({ message }) {
   return (
     <div
       className="fixed left-1/2 z-40 px-4 py-2 rounded-full text-sm font-bold shadow-lg"
-      style={{ bottom: "5.5rem", transform: "translateX(-50%)", background: COLORS.brown, color: "#fff" }}
+      style={{ bottom: "6.5rem", transform: "translateX(-50%)", background: COLORS.brown, color: "#fff" }}
     >
       {message}
     </div>
@@ -582,7 +595,7 @@ function MenuView({
         ))}
       </div>
 
-      <div className="sticky mt-6 pb-4 pt-3" style={{ bottom: "4.25rem", background: "linear-gradient(180deg, rgba(255,248,238,0) 0%, #FFF8EE 35%)" }}>
+      <div className="sticky mt-6 pb-4 pt-3" style={{ bottom: "5.5rem", background: "linear-gradient(180deg, rgba(255,248,238,0) 0%, #FFF8EE 35%)" }}>
         <button
           onClick={onAddBoxToCart}
           disabled={!canAdd}
@@ -1238,7 +1251,7 @@ export default function App() {
           <InstallBanner onInstallClick={handleInstallClick} onDismiss={() => setBannerDismissed(true)} />
         )}
         {showIosModal && <IosInstallModal onClose={() => setShowIosModal(false)} />}
-        <main className="flex-1 overflow-y-auto" style={{ paddingBottom: showBottomNav ? "5rem" : "1rem" }}>
+        <main className="flex-1 overflow-y-auto" style={{ paddingBottom: showBottomNav ? "5.75rem" : "1rem" }}>
           {tab === "home" && (
             <HomeView
               onGoMenu={() => setTab("menu")}
