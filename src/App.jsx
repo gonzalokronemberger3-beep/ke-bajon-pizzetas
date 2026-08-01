@@ -84,6 +84,7 @@ const REWARDS = [
 const APP_VERSION = "1.4.1";
 const GITHUB_REPO = "gonzalokronemberger3-beep/ke-bajon-pizzetas";
 const DOWNLOAD_URL = "https://ke-bajon-app.vercel.app/kebajon-release.apk";
+const ADMIN_PIN = "5173";
 const DELIVERY_COSTS = { cercana: 2000, alejada: 3500 };
 
 const STEPS = [
@@ -490,6 +491,59 @@ function IosInstallModal({ onClose }) {
         >
           Entendido
         </button>
+      </div>
+    </div>
+  );
+}
+
+function PinModal({ onClose, onSubmit, title, error }) {
+  const [value, setValue] = useState("");
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center"
+      style={{ background: "rgba(0,0,0,0.5)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full rounded-t-3xl p-5"
+        style={{ maxWidth: "430px", background: "#fff" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="font-extrabold text-lg mb-1" style={{ color: COLORS.brown, fontFamily: "'Baloo 2', sans-serif" }}>
+          {title}
+        </div>
+        <p className="text-xs mb-3" style={{ color: COLORS.muted }}>Ingresá el PIN de seguridad.</p>
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value.replace(/[^0-9]/g, "").slice(0, 8))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onSubmit(value);
+          }}
+          placeholder="••••"
+          inputMode="numeric"
+          type="password"
+          autoFocus
+          className="w-full rounded-xl px-3 py-3 text-center text-xl font-extrabold tracking-widest"
+          style={{ background: COLORS.cream, border: `1.5px solid ${COLORS.line}`, color: COLORS.brown }}
+        />
+        {error && <p className="text-xs mt-2 text-center font-bold" style={{ color: COLORS.red }}>{error}</p>}
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-full py-2 font-extrabold"
+            style={{ background: COLORS.cream, border: `1.5px solid ${COLORS.line}`, color: COLORS.brown }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => onSubmit(value)}
+            disabled={value.length === 0}
+            className="flex-1 rounded-full py-2 font-extrabold"
+            style={{ background: COLORS.red, color: "#fff", opacity: value.length === 0 ? 0.5 : 1 }}
+          >
+            Entrar
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1502,6 +1556,9 @@ function isNewerVersion(latest, current) {
 
 export default function App() {
   const [tab, setTab] = useState("home");
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
+  const [showAdminPin, setShowAdminPin] = useState(false);
+  const [adminPinError, setAdminPinError] = useState("");
   const [boxSize, setBoxSize] = useState("x6");
   const [boxFlavors, setBoxFlavors] = useState({});
   const [boxAddons, setBoxAddons] = useState({});
@@ -2042,6 +2099,25 @@ export default function App() {
   const popularFlavors = FLAVORS.filter((f) => f.popular);
   const showBottomNav = tab !== "admin";
 
+  const openAdmin = () => {
+    if (adminUnlocked) {
+      setTab("admin");
+      return;
+    }
+    setAdminPinError("");
+    setShowAdminPin(true);
+  };
+
+  const handleAdminPinSubmit = (value) => {
+    if (value === ADMIN_PIN) {
+      setAdminUnlocked(true);
+      setShowAdminPin(false);
+      setAdminPinError("");
+      setTab("admin");
+    } else {
+      setAdminPinError("PIN incorrecto, probá de nuevo");
+    }
+  };
   return (
     <div className="min-h-screen w-full flex justify-center" style={{ background: "linear-gradient(180deg, #8C1626 0%, #2C1810 100%)" }}>
       <div className="w-full flex flex-col relative" style={{ maxWidth: "430px", minHeight: "100vh", background: COLORS.cream, boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
@@ -2068,7 +2144,7 @@ export default function App() {
             <HomeView
               onGoMenu={() => setTab("menu")}
               onGoRewards={() => setTab("rewards")}
-              onGoAdmin={() => setTab("admin")}
+              onGoAdmin={openAdmin}
               popularFlavors={popularFlavors}
             />
           )}
@@ -2122,7 +2198,15 @@ export default function App() {
             />
           )}
           {tab === "confirm" && <ConfirmView summary={lastOrder} onBackHome={() => setTab("home")} />}
-          {tab === "admin" && <AdminView orderLog={orderLog} onBack={() => setTab("home")} />}
+          {tab === "admin" && adminUnlocked && <AdminView orderLog={orderLog} onBack={() => setTab("home")} />}
+          {showAdminPin && (
+            <PinModal
+              title="Panel del dueño"
+              error={adminPinError}
+              onClose={() => setShowAdminPin(false)}
+              onSubmit={handleAdminPinSubmit}
+            />
+          )}
           {tab === "delivery" && (
             <DeliveryView
               worker={deliveryAuth}
